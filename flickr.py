@@ -54,12 +54,13 @@ class Photoset:
   
   @staticmethod
   def find(title):
+    #return [photoset for photoset in Data.Photosets if photoset.title == title]
     for photoset in Data.Photosets:      
       if photoset.title == title:
         return photoset
     
     return None
-    
+  
   @staticmethod
   def create(title, photo):
     rsp = Data.flickr.photosets_create(api_key = Data.key, title = title, primary_photo_id = photo.id)
@@ -76,6 +77,15 @@ class Photoset:
     
   def add_photo(self, photo):
     Data.flickr.photosets_addPhoto(api_key = Data.key, photoset_id = self.id, photo_id = photo.id)
+    self.photos.append(photo)
+    
+  def find_photo(self, title):
+    #return [photo for photo in self.photos if photo.title == title]
+    for photo in self.photos:
+      if photo.title == title:
+        return photo
+    
+    return None
 
 def __read_authinfo():
   try:
@@ -83,8 +93,8 @@ def __read_authinfo():
     Data.token, Data.nsid = f.readlines(2)
     Data.token = Data.token.strip()
     f.close()
-  except IOError as e:
-    raise e
+  except:
+    return False
     
   return True
   
@@ -93,7 +103,7 @@ def __write_authinfo():
     f = open('.authinfo', 'w')
     f.writelines([Data.token + '\n', Data.nsid])
     f.close()
-  except IOError:
+  except:
     return False
     
   return True
@@ -105,22 +115,31 @@ def __photos(photoset_id):
   
   for photoset in rsp.findall('photoset'):
     for photo in photoset.findall('photo'):
-      photos.append(Photo(photo.attrib['id']), photo.attrib['title'])
+      photos.append(Photo(photo.attrib['id'], photo.attrib['title']))
+      
+  return photos
   
-def __photosets():
+def __photosets(callback):
   rsp = Data.flickr.photosets_getList(api_key = Data.key, user_id = Data.nsid)
   
   photosets = []
   
-  for photoset in rsp.find('photosets').findall('photoset'):
+  total_photoset  = len(rsp.find('photosets').findall('photoset'))
+  
+  for photoset in rsp.find('photosets').findall('photoset'):      
     photosets.append(Photoset(photoset.attrib['id'], photoset.attrib['primary'], photoset.find('title').text, photoset.find('description').text))
-    #photosets[-1].photos  = __photos(photosets[-1].id)
+    
+    if callback:
+      callback(len(photosets), total_photoset, photosets[-1], False)
+      
+    photosets[-1].photos  = __photos(photosets[-1].id)
+    
+    if callback:
+      callback(len(photosets), total_photoset, photosets[-1], True)
   
   return photosets
   
 def login():
-  global Photosets
-  
   if Data.frob and not Data.token:
     Data.flickr = flickrapi.FlickrAPI(Data.key, Data.secret)
     rsp = Data.flickr.auth_getToken(api_key = Data.key, frob = Data.frob)
@@ -132,13 +151,17 @@ def login():
     return False
     
   Data.flickr = flickrapi.FlickrAPI(Data.key, Data.secret, Data.nsid, Data.token)
-  Photosets = Data.Photosets = __photosets()
+  
   return True
   
 def auth():  
   Data.flickr = flickrapi.FlickrAPI(Data.key, Data.secret)
   
   rsp         = Data.flickr.auth_getFrob(api_key = Data.key)
-  Data.frob = rps.find('frob').text
+  Data.frob = rsp.find('frob').text
   
   return Data.flickr.auth_url('write', Data.frob)
+  
+def load_photosets(callback):
+  global Photosets
+  Photosets = Data.Photosets = __photosets(callback)

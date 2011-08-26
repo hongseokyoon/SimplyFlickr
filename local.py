@@ -4,9 +4,9 @@ import flickr
 
 class Photo:
   def __init__(self, path):
-    self.path   = path
-    self.title  = path.split('/')[-1]
-    self.size   = os.path.getsize(self.path)
+    self.path     = path
+    self.title    = path.split('/')[-1][0:-4]
+    self.size     = os.path.getsize(self.path)
     
   def upload(self, callback = None):
     return flickr.Photo.upload(self.path, callback)
@@ -38,10 +38,15 @@ class Photoset:
     
     for photo in self.photos:
       def __upload_callback(progress, done):
-        callback(photo, progress, done)
+        callback(self, photo, progress, done)
       
-      if callback: callback(photo, 0, False)
+      if flickr_photoset and flickr_photoset.find_photo(photo.title):
+        print 'duplicated photo:', photo.__dict__
+        continue
+      
+      if callback: callback(self, photo, 0, False)
       flickr_photo  = photo.upload(__upload_callback if callback else None)
+      if callback: callback(self, photo, 0, True)
       
       if not flickr_photoset:
         flickr_photoset = flickr.Photoset.create(self.title, flickr_photo)
