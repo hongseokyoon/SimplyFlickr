@@ -56,7 +56,9 @@ class FilePart(Part):
     def __init__(self, parameters, filename, content_type):
         parameters['filename'] = filename
         
-        imagefile = open(filename, 'rb')
+        #print "multipart: " + filename + " --- " + str(filename.__class__)
+        imagefile = open(filename.decode('utf-8'), 'rb')
+        #imagefile = open(filename, 'rb')
         payload = imagefile.read()
         imagefile.close()
 

@@ -75,6 +75,11 @@ class Photoset:
     Data.Photosets.append(new_photoset)
     return new_photoset
     
+  @staticmethod
+  def load(callback):
+    global Photosets
+    Photosets = Data.Photosets = __photosets(callback)
+  
   def add_photo(self, photo):
     Data.flickr.photosets_addPhoto(api_key = Data.key, photoset_id = self.id, photo_id = photo.id)
     self.photos.append(photo)
@@ -140,6 +145,7 @@ def __photosets(callback):
   return photosets
   
 def login():
+  '''
   if Data.frob and not Data.token:
     Data.flickr = flickrapi.FlickrAPI(Data.key, Data.secret)
     rsp = Data.flickr.auth_getToken(api_key = Data.key, frob = Data.frob)
@@ -153,15 +159,27 @@ def login():
   Data.flickr = flickrapi.FlickrAPI(Data.key, Data.secret, Data.nsid, Data.token)
   
   return True
+  '''
+  auth_url  = None
+  
+  if not Data.token:
+    Data.flickr = flickrapi.FlickrAPI(Data.key, Data.secret)
+    (Data.token, Data.frob, Data.nsid, auth_url) = Data.flickr.get_token_part_one(perms = 'write')
+
+    if Data.token:
+      Data.flickr = flickrapi.FlickrAPI(Data.key, Data.secret, Data.nsid, Data.token)
+      
+      return (True, None)
+      
+  return (False, auth_url)
   
 def auth():  
+  '''
   Data.flickr = flickrapi.FlickrAPI(Data.key, Data.secret)
   
   rsp         = Data.flickr.auth_getFrob(api_key = Data.key)
   Data.frob = rsp.find('frob').text
   
   return Data.flickr.auth_url('write', Data.frob)
-  
-def load_photosets(callback):
-  global Photosets
-  Photosets = Data.Photosets = __photosets(callback)
+  '''
+  (Data.token, Data.nsid) = Data.flickr.get_token_part_two((Data.token, Data.frob))

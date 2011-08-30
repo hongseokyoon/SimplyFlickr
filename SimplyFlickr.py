@@ -2,7 +2,6 @@ import flickr
 import local
 import wx
 import time
-#from threading import Thread, Event
 import threading
 from wx.lib.pubsub import Publisher
 
@@ -53,6 +52,16 @@ class StoppableThread(threading.Thread):
   def stopped(self):
     return self._stop.isSet()
     
+class AddPhotosetsThread(StoppableThread):
+  def __init__(self, dir):
+    StoppableThread.__init__(self)
+    self.dir  = dir
+    self.start()
+    
+  def run(self):
+    #local.Photoset
+    pass
+    
 class UploadPhotosetsThread(StoppableThread):
   def __init__(self, localPhotosets, callback = None):
     StoppableThread.__init__(self)
@@ -76,125 +85,61 @@ class LoadPhotosetsThread(StoppableThread):
       self.flickr.load_photosets(self.callback)
       Publisher().sendMessage(('UpdateFlickrTree'), None)
     except wx.PyDeadObjectError:
+      # thread is stopped
       pass
-'''    
+
 class BasicPanel(wx.Panel):
-  def __init__(self, parent):
-    wx.PAnel.__init__(self, parent)
-    
-    sizer       = wx.BoxSizer(wx.VERTICAL)
-    
-    viewSizer   = wx.BoxSizer(wx.HORIZONTAL)
-    inputSizer  = wx.BoxSizer(wx.HORIZONTAL)
-    
-    self.photosets  = []
-    self.tree       = wx.TreeCtrl(self)
-    
-    self.tree.AddRoot('Local')    
-    
-    sizer.Add(viewSizer, 1, flag = wx.EXPAND)
-    sizer.Add(inputSizer, 0)
-    
-    viewSizer.Add(self.tree, 1, flag = wx.EXPAND | wx.TOP | wx.LEFT, border = 5)
-'''        
-class LocalPanel(wx.Panel):
-  def __init__(self, parent):
+  def __init__(self, parent, rootTitle):
     wx.Panel.__init__(self, parent)
     
-    sizer       = wx.BoxSizer(wx.VERTICAL)
+    sizer           = wx.BoxSizer(wx.VERTICAL)
     
-    viewSizer   = wx.BoxSizer(wx.HORIZONTAL)
-    inputSizer  = wx.BoxSizer(wx.HORIZONTAL)
+    self.viewSizer  = wx.BoxSizer(wx.HORIZONTAL)
+    self.inputSizer = wx.BoxSizer(wx.HORIZONTAL)
     
     self.photosets  = []
     self.tree       = wx.TreeCtrl(self)
-    self.addButton  = wx.Button(self, label = '+', size = (30, 30))
-    self.delButton  = wx.Button(self, label = '-', size = (30, 30))
-    self.upButton   = wx.Button(self, label = '^', size = (30, 30))
     
-    self.tree.AddRoot('Local')    
+    self.tree.AddRoot(rootTitle)
     
-    sizer.Add(viewSizer, 1, flag = wx.EXPAND)
-    sizer.Add(inputSizer, 0)
+    sizer.Add(self.viewSizer, 1, flag = wx.EXPAND)
+    sizer.Add(self.inputSizer, 0)
     
-    viewSizer.Add(self.tree, 1, flag = wx.EXPAND | wx.TOP | wx.LEFT, border = 5)
-    inputSizer.Add(self.addButton, flag = wx.ALL, border = 5)
-    inputSizer.Add(self.delButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
-    inputSizer.Add(self.upButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
+    if rootTitle == 'Local':
+      self.viewSizer.Add(self.tree, 1, flag = wx.EXPAND | wx.TOP | wx.LEFT, border = 5)
+    else:
+      self.viewSizer.Add(self.tree, 1, flag = wx.EXPAND | wx.TOP | wx.RIGHT, border = 5)
     
     self.SetSizer(sizer)
     self.SetAutoLayout(1)
     sizer.Fit(self)
-    
-    self.Bind(wx.EVT_BUTTON, self.OnAddButton, self.addButton)
-    self.Bind(wx.EVT_BUTTON, self.OnDelButton, self.delButton)
-    self.Bind(wx.EVT_BUTTON, self.OnUpButton, self.upButton)    
-    self.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnTreeSelChanged, self.tree)
-    
-  def OnAddButton(self, event):
-    dialog  = wx.DirDialog(self)
-    if (dialog.ShowModal() == wx.ID_OK):
-      dir = dialog.GetPath().replace('\\', '/')
-      
-      if self.__PhotosetExist(dir):
-        wx.MessageDialog(self, 'Duplicated path: %s' % dir, 'Error', wx.OK).ShowModal()
-      else:
-        self.__AddPhotoset(local.Photoset(dir))
   
-    dialog.Destroy()
-    
-  def OnDelButton(self, event):
-    if not self.tree.GetSelection().IsOk(): return
-    if self.tree.GetItemParent(self.tree.GetSelection()) != self.tree.GetRootItem(): return
-    
-    photoset  = self.tree.GetItemData(self.tree.GetSelection()).GetData()
-    self.__DelPhotoset(photoset)
-    
-  def OnUpButton(self, event):
-    #UploadPhotosetsThread(self.photosets, self.UploadPhotosetsThreadCallback)
-    pass
-      
-  def OnTreeSelChanged(self, event):
-    #photoset  = self.tree.GetItemData(event.GetItem()).GetData()
-    #if localPhotoset:
-    #  self.statusBar.SetStatusText(localPhotoset.dir) 
-    #print self.tree.GetSelection()
-    #print self.tree.GetItemText(self.tree.GetSelection())
-    pass
-  
-  def __PhotosetExist(self, dir):
-    for photoset in self.photosets:
-      if photoset.dir == dir:
-        return True
-        
-    return False
-  
-  def __AddPhotoset(self, photoset):
+  def _AddPhotoset(self, photoset):
     self.photosets.append(photoset)    
-    self.__UpdateTree()
+    self._UpdateTree()
   
-  def __DelPhotoset(self, photoset):
+  def _DelPhotoset(self, photoset):
     self.photosets.remove(photoset)
-    self.__UpdateTree()  
+    self._UpdateTree()  
   
-  def __GetPhotosetTitle(self, photoset):
-    total_size  = 0
-    for photo in photoset.photos:
-      total_size  += photo.size
-    
-    return '%s: %d photo(s) %.1d MB' % (photoset.title, len(photoset.photos), total_size / 1024.0 / 1024.0)
+  def _GetPhotosetTitle(self, photoset):
+    return photoset.title
   
-  def __GetPhotoTitle(self, photo):
+  def _GetPhotoTitle(self, photo):
     return photo.title
   
-  def __AppendTreeItem(self, photoset):
-    item  = self.tree.AppendItem(self.tree.GetRootItem(), self.__GetPhotosetTitle(photoset), data = wx.TreeItemData(photoset))
+  def _AppendTreeItem(self, photoset):
+    item  = self.tree.AppendItem(self.tree.GetRootItem(), self._GetPhotosetTitle(photoset), data = wx.TreeItemData(photoset))
     
     # sub trees - photos
     for photo in photoset.photos:
-      self.tree.AppendItem(item, self.__GetPhotoTitle(photo), data = wx.TreeItemData(photo))
+      self.tree.AppendItem(item, self._GetPhotoTitle(photo), data = wx.TreeItemData(photo))
+    
+    # expand root
+    if self.tree.GetChildrenCount(self.tree.GetRootItem(), False) == 1:
+      self.tree.Expand(self.tree.GetRootItem())
 
-  def __UpdateTree(self):
+  def _UpdateTree(self):
     """
     Update tree items as photosets list
     """
@@ -203,12 +148,11 @@ class LocalPanel(wx.Panel):
       self.tree.DeleteChildren(self.tree.GetRootItem())
       return
       
-    GetRootItem())
     itemID, cookie  = self.tree.GetFirstChild(self.tree.GetRootItem())
     
     for photoset in self.photosets:
       if not itemID.IsOk():
-        self.__AppendTreeItem(photoset)
+        self._AppendTreeItem(photoset)
         continue    
       
       while itemID.IsOk():
@@ -222,58 +166,121 @@ class LocalPanel(wx.Panel):
       itemIDCopy  = itemID
       itemID  = self.tree.GetNextSibling(itemID)
       self.tree.Delete(itemIDCopy)
+      
+class LocalPanel(BasicPanel):
+  def __init__(self, parent, upCallback = None, addCallback = None):
+    BasicPanel.__init__(self, parent, 'Local')
     
-class FlickrPanel(wx.Panel):
+    self.upCallback   = upCallback
+    self.addCallback  = addCallback
+    
+    self.addButton  = wx.Button(self, label = '+', size = (30, 30))
+    self.delButton  = wx.Button(self, label = '-', size = (30, 30))
+    self.upButton   = wx.Button(self, label = '^', size = (30, 30))
+ 
+    self.inputSizer.Add(self.addButton, flag = wx.ALL, border = 5)
+    self.inputSizer.Add(self.delButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
+    self.inputSizer.Add(self.upButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
+
+    self.Bind(wx.EVT_BUTTON, self.OnAddButton, self.addButton)
+    self.Bind(wx.EVT_BUTTON, self.OnDelButton, self.delButton)
+    self.Bind(wx.EVT_BUTTON, self.OnUpButton, self.upButton)    
+    self.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnTreeSelChanged, self.tree)
+    
+    #self.tree.Bind(wx.EVT_LEFT_DOWN, self.OnTreeLeftClick)
+    
+  def OnAddButton(self, event):
+    dialog  = wx.DirDialog(self)
+    if (dialog.ShowModal() == wx.ID_OK):
+      dir = dialog.GetPath().replace('\\', '/')
+      
+      if self._PhotosetExist(dir):
+        wx.MessageDialog(self, 'Duplicated path: %s' % dir, 'Error', wx.OK).ShowModal()
+      else:
+        self._AddPhotoset(local.Photoset(dir))
+  
+    dialog.Destroy()
+    
+  def OnDelButton(self, event):
+    if not self.tree.GetSelection().IsOk(): return
+    if self.tree.GetItemParent(self.tree.GetSelection()) != self.tree.GetRootItem(): return
+    
+    photoset  = self.tree.GetItemData(self.tree.GetSelection()).GetData()
+    self._DelPhotoset(photoset)
+    
+  def OnUpButton(self, event):
+    UploadPhotosetsThread(self.photosets, self.upCallback)
+      
+  def OnTreeSelChanged(self, event):
+    pass
+  '''
+  def OnTreeLeftClick(self, event):
+    #self.tree.UnselectAll()
+    itemID, flags = self.tree.HitTest(event.GetPosition())
+    if (flags & wx.TREE_HITTEST_ONITEM) != 0:
+      self.tree.SetItemBold(itemID, not self.tree.IsBold(itemID))
+  '''
+  def _PhotosetExist(self, dir):
+    for photoset in self.photosets:
+      if photoset.dir == dir:
+        return True
+        
+    return False
+  
+  def _GetPhotosetTitle(self, photoset):
+    total_size  = 0
+    for photo in photoset.photos:
+      total_size  += photo.size
+    
+    return '%s: %d photo(s) %.1d MB' % (photoset.title, len(photoset.photos), total_size / 1024.0 / 1024.0)
+
+class FlickrPanel(BasicPanel):
   def __init__(self, parent):
-    wx.Panel.__init__(self, parent)
-    
-    sizer       = wx.BoxSizer(wx.VERTICAL)
-    
-    viewSizer   = wx.BoxSizer(wx.HORIZONTAL)
-    inputSizer  = wx.BoxSizer(wx.HORIZONTAL)
-    
-    self.tree       = wx.TreeCtrl(self, style = wx.TR_HIDE_ROOT)
+    BasicPanel.__init__(self, parent, 'Flickr')
+        
     self.loadButton = wx.Button(self, label = 'L', size = (30, 30))
     self.downButton = wx.Button(self, label = 'v', size = (30, 30))
     
-    self.tree.AddRoot('root')
+    self.inputSizer.Add(self.loadButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
+    self.inputSizer.Add(self.downButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
+  
+    self.Bind(wx.EVT_BUTTON, self.OnLoadButton, self.loadButton)
+    self.Bind(wx.EVT_BUTTON, self.OnDownButton, self.downButton)
     
-    sizer.Add(viewSizer, 1, flag = wx.EXPAND)
-    sizer.Add(inputSizer, 0)
+  def OnLoadButton(self, event):
+    pass
     
-    viewSizer.Add(self.tree, 1, flag = wx.EXPAND | wx.TOP | wx.RIGHT, border = 5)
-    inputSizer.Add(self.loadButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
-    inputSizer.Add(self.downButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
+  def OnDownButton(self, event):
+    pass
     
-    self.SetSizer(sizer)
-    self.SetAutoLayout(1)
-    sizer.Fit(self)
-    
+  def _GetPhotosetTitle(self, photoset):
+    return '%s: %d photo(s)' % (photoset.title, len(photoset.photos))
+
 class MainFrame(wx.Frame):
   def __init__(self, parent):
     wx.Frame.__init__(self, parent, title = 'SimplyFlickr', size = (600, 400))
-    
-    self.localPhotosets   = []
-    self.flickrPhotosets  = []
-    
-    splitter  = wx.SplitterWindow(self, style = wx.SP_BORDER)
-    
+        
+    splitter    = wx.SplitterWindow(self, style = wx.SP_BORDER)    
     localPanel  = LocalPanel(splitter)
     flickrPanel = FlickrPanel(splitter)
     splitter.SplitVertically(localPanel, flickrPanel)
-    
-    #self.__ComposeLeftPanel(leftPanel)
-    #self.__ComposeRightPanel(rightPanel)
-    
-    #SplashDialog(self).ShowModal()
-    
+    '''
     if not flickr.login():
       if AuthDialog(self, flickr.auth()).ShowModal() == wx.ID_OK:
         flickr.login()
       else:
         wx.MessageDialog(self, 'Failed to login', 'Error', wx.OK)
         self.Destroy()
-     
+    '''
+    (succ, auth_url)  = flickr.login()
+    print (succ, auth_url)
+    if not succ:
+      if AuthDialog(self, auth_url).ShowModal() == wx.ID_OK:
+        print flickr.auth()
+      else:
+        wx.MessageDialog(self, 'Failed to login', 'Error', wx.OK)
+        self.Destroy()
+        
     Publisher().subscribe(self.AfterLoadPhotosets, ('UpdateFlickrTree'))
     #self.thread = LoadPhotosetsThread(flickr, self.LoadPhotosetsThreadCallback)
     #flickr.load_photosets()
@@ -302,7 +309,7 @@ class MainFrame(wx.Frame):
     self.Bind(wx.EVT_BUTTON, self.OnUpButton, localPanel.upButton)    
     self.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnLocalTreeSelChanged, localPanel.tree)
     '''
-    self.Bind(wx.EVT_BUTTON, self.OnDownButton, flickrPanel.downButton)
+    #self.Bind(wx.EVT_BUTTON, self.OnDownButton, flickrPanel.downButton)
     
     self.Show()
   
@@ -347,22 +354,6 @@ class MainFrame(wx.Frame):
     self.statusBarGauge = wx.Gauge(self.statusBar, pos = (2, 2), size = (200, statusBarClientHeight - 4))
     self.statusBarText  = wx.StaticText(self.statusBar, pos = (210, 2), size = (statusBarClientWidth - 210, statusBarClientHeight - 4))
 
-  def OnAddButton(self, event):
-    dialog  = wx.DirDialog(self)
-    if (dialog.ShowModal() == wx.ID_OK):
-      dir = dialog.GetPath().replace('\\', '/')
-      self.__AddLocalPhotoset(dir)
-    dialog.Destroy()
-    
-  def OnDelButton(self, event):    
-    self.__DelLocalPhotoset(self.localTree.GetSelection())
-    
-  def OnUpButton(self, event):
-    UploadPhotosetsThread(self.localPhotosets, self.UploadPhotosetsThreadCallback)
-    
-  def OnDownButton(self, event):
-    pass
-  
   def OnLocalTreeSelChanged(self, event):
     localPhotoset = self.localTree.GetItemData(event.GetItem()).GetData()
     if localPhotoset:
@@ -370,49 +361,7 @@ class MainFrame(wx.Frame):
   
   def AfterLoadPhotosets(self, msg):
     self.__UpdateFlickrTree()
-    
-  def __AddLocalPhotoset(self, dir):
-    if len([photoset for photoset in self.localPhotosets if photoset.dir == dir]) > 0:
-      wx.MessageDialog(self, 'Duplicated path: %s' % dir, 'Error', wx.OK)
-      return
-    
-    # manipulate localPhotoset array
-    new_photoset  = local.Photoset(dir)
-    self.localPhotosets.append(new_photoset)
-    
-    # manipulate tree ctrl
-    item  = self.localTree.AppendItem(self.localTreeRoot, self.__GetLocalPhotosetTitle(new_photoset), data = wx.TreeItemData(new_photoset))
-    
-    for photo in new_photoset.photos:
-      self.localTree.AppendItem(item, photo.title)
-    
-  def __DelLocalPhotoset(self, itemID):
-    localPhotoset = self.localTree.GetItemData(itemID).GetData()
-    if localPhotoset:
-      self.localPhotosets.remove(localPhotoset)
-      self.localTree.Delete(itemID)
-        
-  
-  def __GetLocalPhotosetTitle(self, photoset):
-    total_size  = 0
-    for photo in photoset.photos:
-      total_size  += photo.size
-    
-    return '%s: %d photo(s) %.1d MB' % (photoset.title, len(photoset.photos), total_size / 1024.0 / 1024.0)
-  
-  def __GetFlickrPhotosetTitle(self, photoset):
-    return '%s: %d photo(s)' % (photoset.title, len(photoset.photos))
-  # __UpdatLlocalTree(self):
-  #  pass
-    
-  def __UpdateFlickrTree(self):
-    self.flickrTree.DeleteAllItems()
-    
-    for photoset in flickr.Photosets:
-      item  = self.flickrTree.AppendItem(self.flickrTreeRoot, self.__GetFlickrPhotosetTitle(photoset), data = wx.TreeItemData(photoset))
-      for photo in photoset.photos:
-        self.flickrTree.AppendItem(item, photo.title, data = wx.TreeItemData(photo))
-    
+
 app   = wx.App(False)
 frame = MainFrame(None)
 app.MainLoop()

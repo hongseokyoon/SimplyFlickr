@@ -722,6 +722,9 @@ class FlickrAPI(object):
         token = self.token_cache.token
         frob = None
 
+        auth_url  = None
+        nsid      = None
+        
         # see if it's valid
         if token:
             LOG.debug("Trying cached token '%s'" % token)
@@ -732,6 +735,9 @@ class FlickrAPI(object):
                 tokenPerms = rsp.auth[0].perms[0].text
                 if tokenPerms == "read" and perms != "read": token = None
                 elif tokenPerms == "write" and perms == "delete": token = None
+                
+                if token:
+                  nsid  = rsp.auth[0].user[0]['nsid']
             except FlickrError:
                 LOG.debug("Cached token invalid")
                 self.token_cache.forget()
@@ -749,9 +755,10 @@ class FlickrAPI(object):
             rsp = self.auth_getFrob(auth_token=None, format='xmlnode')
 
             frob = rsp.frob[0].text
-            authenticate(frob, perms)
+            #authenticate(frob, perms)
+            auth_url  = self.auth_url(perms, frob)
 
-        return (token, frob)
+        return (token, frob, nsid, auth_url)
         
     def get_token_part_two(self, (token, frob)):
         """Part two of getting a token, see ``get_token_part_one(...)`` for details."""
@@ -775,12 +782,13 @@ class FlickrAPI(object):
         rsp = self.auth_getToken(frob=frob, auth_token=None, format='xmlnode')
 
         token = rsp.auth[0].token[0].text
+        nsid  = rsp.auth[0].user[0]['nsid']
         LOG.debug("get_token: new token '%s'" % token)
         
         # store the auth info for next time
         self.token_cache.token = token
 
-        return token
+        return (token, nsid)
 
     def authenticate_console(self, perms='read', auth_callback=None):
         '''Performs the authentication, assuming a console program.
