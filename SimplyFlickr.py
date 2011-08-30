@@ -77,7 +77,26 @@ class LoadPhotosetsThread(StoppableThread):
       Publisher().sendMessage(('UpdateFlickrTree'), None)
     except wx.PyDeadObjectError:
       pass
-      
+'''    
+class BasicPanel(wx.Panel):
+  def __init__(self, parent):
+    wx.PAnel.__init__(self, parent)
+    
+    sizer       = wx.BoxSizer(wx.VERTICAL)
+    
+    viewSizer   = wx.BoxSizer(wx.HORIZONTAL)
+    inputSizer  = wx.BoxSizer(wx.HORIZONTAL)
+    
+    self.photosets  = []
+    self.tree       = wx.TreeCtrl(self)
+    
+    self.tree.AddRoot('Local')    
+    
+    sizer.Add(viewSizer, 1, flag = wx.EXPAND)
+    sizer.Add(inputSizer, 0)
+    
+    viewSizer.Add(self.tree, 1, flag = wx.EXPAND | wx.TOP | wx.LEFT, border = 5)
+'''        
 class LocalPanel(wx.Panel):
   def __init__(self, parent):
     wx.Panel.__init__(self, parent)
@@ -88,12 +107,12 @@ class LocalPanel(wx.Panel):
     inputSizer  = wx.BoxSizer(wx.HORIZONTAL)
     
     self.photosets  = []
-    self.tree       = wx.TreeCtrl(self, style = wx.TR_HIDE_ROOT)
+    self.tree       = wx.TreeCtrl(self)
     self.addButton  = wx.Button(self, label = '+', size = (30, 30))
     self.delButton  = wx.Button(self, label = '-', size = (30, 30))
     self.upButton   = wx.Button(self, label = '^', size = (30, 30))
     
-    self.tree.AddRoot('root')    
+    self.tree.AddRoot('Local')    
     
     sizer.Add(viewSizer, 1, flag = wx.EXPAND)
     sizer.Add(inputSizer, 0)
@@ -139,6 +158,8 @@ class LocalPanel(wx.Panel):
     #photoset  = self.tree.GetItemData(event.GetItem()).GetData()
     #if localPhotoset:
     #  self.statusBar.SetStatusText(localPhotoset.dir) 
+    #print self.tree.GetSelection()
+    #print self.tree.GetItemText(self.tree.GetSelection())
     pass
   
   def __PhotosetExist(self, dir):
@@ -174,31 +195,31 @@ class LocalPanel(wx.Panel):
       self.tree.AppendItem(item, self.__GetPhotoTitle(photo), data = wx.TreeItemData(photo))
 
   def __UpdateTree(self):
-    """Update tree items as photosets list"""    
-    if len(self.photosets) == 0:
-      self.tree.DeleteAllItems()
-      return
+    """
+    Update tree items as photosets list
+    """
     
-    print 'list:', self.photosets
+    if len(self.photosets) == 0:
+      self.tree.DeleteChildren(self.tree.GetRootItem())
+      return
+      
+    GetRootItem())
     itemID, cookie  = self.tree.GetFirstChild(self.tree.GetRootItem())
     
     for photoset in self.photosets:
       if not itemID.IsOk():
         self.__AppendTreeItem(photoset)
-        continue
-      
-      #treePhotoset  = self.tree.GetItemData(itemID).GetData()      
+        continue    
       
       while itemID.IsOk():
         treePhotoset  = self.tree.GetItemData(itemID).GetData()
         itemIDCopy  = itemID
         itemID  = self.tree.GetNextSibling(itemID)
-        if (photoset == treePhotoset):  break
-        
+        if (photoset == treePhotoset):  break        
         self.tree.Delete(itemIDCopy)
     
     while itemID.IsOk():
-      itemIDCyop  = itemID
+      itemIDCopy  = itemID
       itemID  = self.tree.GetNextSibling(itemID)
       self.tree.Delete(itemIDCopy)
     
