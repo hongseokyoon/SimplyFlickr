@@ -2,8 +2,9 @@ import flickr
 import local
 import wx
 import time
-import threading
+#import threading
 from wx.lib.pubsub import Publisher
+import threadjob
 
 class SplashDialog(wx.Dialog):
   def __init__(self, parent):
@@ -41,52 +42,7 @@ class AuthDialog(wx.Dialog):
     self.SetReturnCode(wx.ID_CANCEL)
     event.Skip()
 
-class StoppableThread(threading.Thread):
-  def __init__(self):
-    super(StoppableThread, self).__init__()
-    self._stop = threading.Event()
 
-  def stop(self):
-    self._stop.set()
-
-  def stopped(self):
-    return self._stop.isSet()
-    
-class AddPhotosetsThread(StoppableThread):
-  def __init__(self, dir):
-    StoppableThread.__init__(self)
-    self.dir  = dir
-    self.start()
-    
-  def run(self):
-    #local.Photoset
-    pass
-    
-class UploadPhotosetsThread(StoppableThread):
-  def __init__(self, localPhotosets, callback = None):
-    StoppableThread.__init__(self)
-    self.localPhotosets = localPhotosets
-    self.callback       = callback
-    self.start()
-    
-  def run(self):
-    for localPhotoset in self.localPhotosets:
-      localPhotoset.upload(self.callback)
-    
-class LoadPhotosetsThread(StoppableThread):
-  def __init__(self, flickr, callback = None):
-    StoppableThread.__init__(self)
-    self.flickr   = flickr
-    self.callback = callback
-    self.start()
-    
-  def run(self):
-    try:
-      self.flickr.load_photosets(self.callback)
-      Publisher().sendMessage(('UpdateFlickrTree'), None)
-    except wx.PyDeadObjectError:
-      # thread is stopped
-      pass
 
 class BasicPanel(wx.Panel):
   def __init__(self, parent, rootTitle):
@@ -197,7 +153,8 @@ class LocalPanel(BasicPanel):
       if self._PhotosetExist(dir):
         wx.MessageDialog(self, 'Duplicated path: %s' % dir, 'Error', wx.OK).ShowModal()
       else:
-        self._AddPhotoset(local.Photoset(dir))
+        #self._AddPhotoset(local.Photoset(dir))
+        threadjob.AddPhotosetsThread(dir, self.addCallback)
   
     dialog.Destroy()
     
@@ -209,7 +166,7 @@ class LocalPanel(BasicPanel):
     self._DelPhotoset(photoset)
     
   def OnUpButton(self, event):
-    UploadPhotosetsThread(self.photosets, self.upCallback)
+    threadjob.UploadPhotosetsThread(self.photosets, self.upCallback)
       
   def OnTreeSelChanged(self, event):
     pass
@@ -235,9 +192,12 @@ class LocalPanel(BasicPanel):
     return '%s: %d photo(s) %.1d MB' % (photoset.title, len(photoset.photos), total_size / 1024.0 / 1024.0)
 
 class FlickrPanel(BasicPanel):
-  def __init__(self, parent):
+  def __init__(self, parent, loadCallback = None, downCallback = None):
     BasicPanel.__init__(self, parent, 'Flickr')
-        
+     
+    self.loadCallback = loadCallback
+    self.downCallback = downCallback
+    
     self.loadButton = wx.Button(self, label = 'L', size = (30, 30))
     self.downButton = wx.Button(self, label = 'v', size = (30, 30))
     
@@ -248,10 +208,10 @@ class FlickrPanel(BasicPanel):
     self.Bind(wx.EVT_BUTTON, self.OnDownButton, self.downButton)
     
   def OnLoadButton(self, event):
-    pass
+    threadjob.LoadPhotosetsThread(Data.flickr, loadCallback)
     
   def OnDownButton(self, event):
-    pass
+    threadjob.DownloadPhotosetsThread(self.photosets, downCallback)
     
   def _GetPhotosetTitle(self, photoset):
     return '%s: %d photo(s)' % (photoset.title, len(photoset.photos))
@@ -353,14 +313,6 @@ class MainFrame(wx.Frame):
     
     self.statusBarGauge = wx.Gauge(self.statusBar, pos = (2, 2), size = (200, statusBarClientHeight - 4))
     self.statusBarText  = wx.StaticText(self.statusBar, pos = (210, 2), size = (statusBarClientWidth - 210, statusBarClientHeight - 4))
-
-  def OnLocalTreeSelChanged(self, event):
-    localPhotoset = self.localTree.GetItemData(event.GetItem()).GetData()
-    if localPhotoset:
-      self.statusBar.SetStatusText(localPhotoset.dir)
-  
-  def AfterLoadPhotosets(self, msg):
-    self.__UpdateFlickrTree()
 
 app   = wx.App(False)
 frame = MainFrame(None)

@@ -91,6 +91,12 @@ class Photoset:
         return photo
     
     return None
+    
+  def download(self, callback):
+    for photo in self.photos:
+      if callback: callback(self, photo, 0, False)
+      photo.download(photo.title)
+      if callback: callback(self, photo, 100, True)
 
 def __read_authinfo():
   try:
@@ -183,3 +189,6 @@ def auth():
   return Data.flickr.auth_url('write', Data.frob)
   '''
   (Data.token, Data.nsid) = Data.flickr.get_token_part_two((Data.token, Data.frob))
+  
+def load_photosets(callback):
+  Photoset.load(callback)
