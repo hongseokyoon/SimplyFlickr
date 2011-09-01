@@ -154,7 +154,8 @@ class LocalPanel(BasicPanel):
         wx.MessageDialog(self, 'Duplicated path: %s' % dir, 'Error', wx.OK).ShowModal()
       else:
         #self._AddPhotoset(local.Photoset(dir))
-        threadjob.AddPhotosetsThread(dir, self.addCallback)
+        #threadjob.AddPhotosetThread(dir, self.addCallback)
+        threadjob.AddPhotosetThread(dir, self.AddPhotosetCallback)
   
     dialog.Destroy()
     
@@ -190,6 +191,10 @@ class LocalPanel(BasicPanel):
       total_size  += photo.size
     
     return '%s: %d photo(s) %.1d MB' % (photoset.title, len(photoset.photos), total_size / 1024.0 / 1024.0)
+    
+  def AddPhotosetCallback(self, localPhotoset):
+    print 'AddPhotosetCallback'
+    self._AddPhotoset(localPhotoset)
 
 class FlickrPanel(BasicPanel):
   def __init__(self, parent, loadCallback = None, downCallback = None):
@@ -241,7 +246,7 @@ class MainFrame(wx.Frame):
         wx.MessageDialog(self, 'Failed to login', 'Error', wx.OK)
         self.Destroy()
         
-    Publisher().subscribe(self.AfterLoadPhotosets, ('UpdateFlickrTree'))
+    #Publisher().subscribe(self.AfterLoadPhotosets, ('UpdateFlickrTree'))
     #self.thread = LoadPhotosetsThread(flickr, self.LoadPhotosetsThreadCallback)
     #flickr.load_photosets()
     #self.__UpdateFlickrTree()
@@ -291,7 +296,7 @@ class MainFrame(wx.Frame):
     event.Skip()
     
   def OnClose(self, event):
-    if self.thread: self.thread.stop()
+    #if self.thread: self.thread.stop()
     event.Skip()
   '''  
   def __UpdateStatusBarText(self):

@@ -20,13 +20,17 @@ class AddPhotosetThread(StoppableThread):
     callback(local.Photoset)
     '''
     StoppableThread.__init__(self)
-    self.dir  = dir
+    self.dir      = dir
+    self.callback = callback
     self.start()
     
   def run(self):
     try:    
+      print 'run AddPhotosetThread'
       localPhotoset = local.Photoset(self.dir)
-      callback(localPhotoset)
+      print self.dir
+      print localPhotoset
+      if self.callback: self.callback(localPhotoset)
     except wx.PyDeadObjectError:
       pass
     
