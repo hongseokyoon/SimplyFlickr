@@ -15,7 +15,10 @@ class StoppableThread(threading.Thread):
     return self._stop.isSet()
     
 class AddPhotosetThread(StoppableThread):
-  def __init__(self, dir, callback):
+  def __init__(self, dir, callback = None):
+    '''
+    callback(local.Photoset)
+    '''
     StoppableThread.__init__(self)
     self.dir  = dir
     self.start()
@@ -29,6 +32,9 @@ class AddPhotosetThread(StoppableThread):
     
 class UploadPhotosetsThread(StoppableThread):
   def __init__(self, localPhotosets, callback = None):
+    '''
+    callback(local.Photoset, local.Photo, progress, done)
+    '''
     StoppableThread.__init__(self)
     self.localPhotosets = localPhotosets
     self.callback       = callback
@@ -43,6 +49,9 @@ class UploadPhotosetsThread(StoppableThread):
     
 class LoadPhotosetsThread(StoppableThread):
   def __init__(self, flickr, callback = None):
+    '''
+    callback(photoset_num, total_photoset, flickr.Photoset, done)
+    '''
     StoppableThread.__init__(self)
     self.flickr   = flickr
     self.callback = callback
@@ -58,6 +67,9 @@ class LoadPhotosetsThread(StoppableThread):
       
 class DownloadPhotosetsThread(StoppableThread):
   def __init__(self, flickrPhotosets, callback = None):
+    '''
+    callback(flickr.Photoset, flickr.Photo, progress, done)
+    '''
     StoppableThread.__init__(self)
     
     self.flickrPhotosets  = flickrPhotosets
