@@ -69,6 +69,8 @@ class BasicPanel(wx.Panel):
     self.SetSizer(sizer)
     self.SetAutoLayout(1)
     sizer.Fit(self)
+    
+    self.tree.Bind(wx.EVT_LEFT_DOWN, self.OnTreeLeftClick)
   
   def _AddPhotoset(self, photoset):
     self.photosets.append(photoset)    
@@ -85,11 +87,11 @@ class BasicPanel(wx.Panel):
     return photo.title
   
   def _AppendTreeItem(self, photoset):
-    item  = self.tree.AppendItem(self.tree.GetRootItem(), self._GetPhotosetTitle(photoset), data = wx.TreeItemData(photoset))
+    item  = self.tree.AppendItem(self.tree.GetRootItem(), '[ ] ' + self._GetPhotosetTitle(photoset), data = wx.TreeItemData(photoset))
     
     # sub trees - photos
     for photo in photoset.photos:
-      self.tree.AppendItem(item, self._GetPhotoTitle(photo), data = wx.TreeItemData(photo))
+      self.tree.AppendItem(item, '[ ] ' + self._GetPhotoTitle(photo), data = wx.TreeItemData(photo))
     
     # expand root
     if self.tree.GetChildrenCount(self.tree.GetRootItem(), False) == 1:
@@ -122,6 +124,34 @@ class BasicPanel(wx.Panel):
       itemIDCopy  = itemID
       itemID  = self.tree.GetNextSibling(itemID)
       self.tree.Delete(itemIDCopy)
+  
+  def _TreeItemChecked(self, itemID):
+    text  = self.tree.GetItemText(itemID)
+    return True if text[1] == 'v' else False    
+  
+  def _TreeItemCheckable(self, itemID):
+    return self.tree.GetRootItem() != itemID
+  
+  def _CheckTreeItem(self, itemID, check = True):
+    text  = self.tree.GetItemText(itemID)    
+    text  = ('[v]' if check else '[ ]') + text[3:]
+    self.tree.SetItemText(itemID, text) 
+    
+  def _ToggleTreeItemCheck(self, itemID):
+    if not self._TreeItemCheckable(itemID): return
+    
+    if self._TreeItemChecked(itemID):
+      self._CheckTreeItem(itemID, False)
+    else:
+      self._CheckTreeITem(itemID, True)      
+    
+  def OnTreeLeftClick(self, event):
+    itemID, flags = self.tree.HitTest(event.GetPosition())
+    if (flags & wx.TREE_HITTEST_ONITEM) != 0:
+      #self.tree.SetItemBold(itemID, not self.tree.IsBold(itemID))
+      self._ToggleTreeItemCheck(itemID)
+      
+    event.Skip()
       
 class LocalPanel(BasicPanel):
   def __init__(self, parent, upCallback = None, addCallback = None):
