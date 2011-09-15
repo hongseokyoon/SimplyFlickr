@@ -125,6 +125,33 @@ class BasicPanel(wx.Panel):
       itemID  = self.tree.GetNextSibling(itemID)
       self.tree.Delete(itemIDCopy)
   
+  def _TreeSubItemChecked(self, itemID):
+    if self.tree.GetChildrenCount(itemID) > 0:
+      itemID, cookie  = self.tree.GetFirstChild(itemID)
+      
+      while itemID.IsOk():
+        if not self._TreeItemChecked(itemID):
+          return False
+          
+        itemID  = self.tree.GetNextSibling(itemID)
+          
+    return True
+    
+  def _CheckTreeSubItem(self, itemID, check = True):
+    if self.tree.GetRootItem() != itemID and \
+    self.tree.GetChildrenCount(itemID) > 0:
+      itemID, cookie  = self.tree.GetFirstChild(itemID)
+      
+      while itemID.IsOk():
+        self._CheckTreeItem(itemID, check)
+        itemID  = self.tree.GetNextSibling(itemID)
+        
+  def _CheckTreeParentItem(self, itemID):
+    itemID  = self.tree.GetItemParent(itemID)
+    if itemID == self.tree.GetRootItem(): return
+    
+    self._CheckTreeItem(itemID, self._TreeSubItemChecked(itemID))
+  
   def _TreeItemChecked(self, itemID):
     text  = self.tree.GetItemText(itemID)
     return True if text[1] == 'v' else False    
@@ -135,15 +162,16 @@ class BasicPanel(wx.Panel):
   def _CheckTreeItem(self, itemID, check = True):
     text  = self.tree.GetItemText(itemID)    
     text  = ('[v]' if check else '[ ]') + text[3:]
-    self.tree.SetItemText(itemID, text) 
+    self.tree.SetItemText(itemID, text)
     
   def _ToggleTreeItemCheck(self, itemID):
     if not self._TreeItemCheckable(itemID): return
     
-    if self._TreeItemChecked(itemID):
-      self._CheckTreeItem(itemID, False)
-    else:
-      self._CheckTreeITem(itemID, True)      
+    checked = self._TreeItemChecked(itemID)
+    
+    self._CheckTreeItem(itemID, checked)
+    self._CheckTreeSubItem(itemID, checked)
+    self._CheckTreeParentItem(itemID)
     
   def OnTreeLeftClick(self, event):
     itemID, flags = self.tree.HitTest(event.GetPosition())
