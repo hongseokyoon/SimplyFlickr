@@ -167,7 +167,7 @@ class BasicPanel(wx.Panel):
   def _ToggleTreeItemCheck(self, itemID):
     if not self._TreeItemCheckable(itemID): return
     
-    checked = self._TreeItemChecked(itemID)
+    checked = not self._TreeItemChecked(itemID)
     
     self._CheckTreeItem(itemID, checked)
     self._CheckTreeSubItem(itemID, checked)
