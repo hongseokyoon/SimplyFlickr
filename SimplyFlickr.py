@@ -25,11 +25,19 @@ class SplashDialog(wx.Dialog):
     
 class AuthDialog(wx.Dialog):
   def __init__(self, parent, url):
-    wx.Dialog.__init__(self, parent, title = 'Authentication', size = (300, 300))
+    wx.Dialog.__init__(self, parent, title = 'Authentication')
+    self.Center(wx.CENTER_ON_SCREEN)
     
-    hyperlink_ctrl_authurl  = wx.HyperlinkCtrl(self, wx.ID_ANY, 'here', url, pos = (10, 10), size = (200, 100))
+    hyperlink_ctrl_authurl  = wx.HyperlinkCtrl(self, wx.ID_ANY, 'Go to authenticate this application', url)
+    button_ok               = wx.Button(self, wx.ID_ANY, 'Click this button after authentication')
     
-    button_ok = wx.Button(self, wx.ID_ANY, 'Complete authentication', pos = (10, 110), size = (100, 50))
+    sizer = wx.BoxSizer(wx.VERTICAL)
+    sizer.Add(hyperlink_ctrl_authurl, flag = wx.ALL | wx.ALIGN_CENTER, border = 20)
+    sizer.Add(button_ok, flag = wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.ALIGN_CENTER, border = 20)
+    
+    self.SetSizer(sizer)
+    self.SetAutoLayout(1)
+    sizer.Fit(self)
     
     self.Bind(wx.EVT_BUTTON, self.OnButtonOK, button_ok)
     self.Bind(wx.EVT_CLOSE, self.OnClose, self)
