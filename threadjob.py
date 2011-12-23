@@ -1,7 +1,8 @@
 import threading
 import local
 import wx
-#from wx.lib.pubsub import Publisher
+import flickr
+from wx.lib.pubsub import Publisher
 
 class StoppableThread(threading.Thread):
   def __init__(self):
@@ -63,8 +64,7 @@ class LoadPhotosetsThread(StoppableThread):
     
   def run(self):
     try:
-      self.flickr.load_photosets(self.callback)
-      #Publisher().sendMessage(('UpdateFlickrTree'), None)
+      photosets = flickr.load_photosets(self.callback)
     except wx.PyDeadObjectError:
       # thread is stopped
       pass
@@ -83,6 +83,6 @@ class DownloadPhotosetsThread(StoppableThread):
   def run(self):
     try:
       for flickrPhotoset in self.flickrPhotosets:
-        flickrPhotoset.download(callback)
+        flickrPhotoset.download(self.callback)
     except wx.PyDeadObjectError:
       pass

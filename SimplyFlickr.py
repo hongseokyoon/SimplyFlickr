@@ -86,7 +86,11 @@ class BasicPanel(wx.Panel):
   
   def _DelPhotoset(self, photoset):
     self.photosets.remove(photoset)
-    self._UpdateTree()  
+    self._UpdateTree()
+    
+  def _ClearPhotosets(self):
+    del self.photosets[:]
+    self._UpdateTree()
   
   def _GetPhotosetTitle(self, photoset):
     return photoset.title
@@ -279,10 +283,11 @@ class FlickrPanel(BasicPanel):
     self.Bind(wx.EVT_BUTTON, self.OnDownButton, self.downButton)
     
   def OnLoadButton(self, event):
-    threadjob.LoadPhotosetsThread(Data.flickr, loadCallback)
+    self._ClearPhotosets()
+    threadjob.LoadPhotosetsThread(flickr.Data.flickr, self.loadCallback)
     
   def OnDownButton(self, event):
-    threadjob.DownloadPhotosetsThread(self.photosets, downCallback)
+    threadjob.DownloadPhotosetsThread(self.photosets, self.downCallback)
     
   def _GetPhotosetTitle(self, photoset):
     return '%s: %d photo(s)' % (photoset.title, len(photoset.photos))
@@ -292,9 +297,9 @@ class MainFrame(wx.Frame):
     wx.Frame.__init__(self, parent, title = 'SimplyFlickr', size = (600, 400))
         
     splitter    = wx.SplitterWindow(self, style = wx.SP_BORDER)    
-    localPanel  = LocalPanel(splitter)
-    flickrPanel = FlickrPanel(splitter)
-    splitter.SplitVertically(localPanel, flickrPanel)
+    self.localPanel  = LocalPanel(splitter)
+    self.flickrPanel = FlickrPanel(splitter, self.Callback_LoadFlickrPhotosets)
+    splitter.SplitVertically(self.localPanel, self.flickrPanel)
     '''
     if not flickr.login():
       if AuthDialog(self, flickr.auth()).ShowModal() == wx.ID_OK:
@@ -312,7 +317,8 @@ class MainFrame(wx.Frame):
         wx.MessageDialog(self, 'Failed to login', 'Error', wx.OK)
         self.Destroy()
         
-    #Publisher().subscribe(self.AfterLoadPhotosets, ('UpdateFlickrTree'))
+    Publisher().subscribe(self.AddFlickrPhotoset, ('AddFlickrPhotoset'))
+    #Publisher()
     #self.thread = LoadPhotosetsThread(flickr, self.LoadPhotosetsThreadCallback)
     #flickr.load_photosets()
     #self.__UpdateFlickrTree()
@@ -385,6 +391,14 @@ class MainFrame(wx.Frame):
     self.statusBarGauge = wx.Gauge(self.statusBar, pos = (2, 2), size = (200, statusBarClientHeight - 4))
     self.statusBarText  = wx.StaticText(self.statusBar, pos = (210, 2), size = (statusBarClientWidth - 210, statusBarClientHeight - 4))
 
+  def AddFlickrPhotoset(self, msg):
+    self.flickrPanel._AddPhotoset(msg.data)
+    self.flickrPanel._UpdateTree()
+
+  def Callback_LoadFlickrPhotosets(self, len, total, photoset, done):
+    if done:
+      Publisher().sendMessage(('AddFlickrPhotoset'), photoset)
+      
 app   = wx.App(False)
 frame = MainFrame(None)
 app.MainLoop()
