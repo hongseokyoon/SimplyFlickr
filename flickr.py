@@ -172,6 +172,9 @@ class Photoset:
     
     new_photoset  = Photoset(photoset_id, primary, title, description)
     Data.Photosets.append(new_photoset)
+    # insert photo into new photoset
+    # (as default, newaly created photoset has to have one photo)
+    new_photoset.photos.append(photo)
     return new_photoset
     
   @staticmethod
@@ -186,7 +189,6 @@ class Photoset:
     self.photos.append(photo)
     
   def find_photo(self, title):
-    #return [photo for photo in self.photos if photo.title == title]
     for photo in self.photos:
       if photo.title == title:
         return photo

@@ -47,8 +47,13 @@ class UploadPhotosetsThread(StoppableThread):
     
   def run(self):
     try:
+      photoset_count  = 0
       for localPhotoset in self.localPhotosets:
+        photoset_count  += 1
+        print u"starting uploading...({0}/{1}) {2}".format(photoset_count, len(self.localPHotosets))
         localPhotoset.upload(self.callback)
+      
+      print "DONE"
     except wx.PyDeadObjectError:
       pass
     
