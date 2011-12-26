@@ -33,7 +33,7 @@ class Photoset:
       
     return total_size
     
-  def upload(self, callback = None):
+  def upload(self, duplicatableTitle = True, callback = None):
     flickr_photoset = flickr.Photoset.find(self.title)
     
     uploaded_count    = 0
@@ -42,7 +42,7 @@ class Photoset:
       def __upload_callback(progress, done):
         callback(self, photo, progress, done)
       
-      if flickr_photoset and flickr_photoset.find_photo(photo.title):
+      if duplicatableTitle == False and flickr_photoset and flickr_photoset.find_photo(photo.title):
         print 'duplicated photo:', photo.__dict__
         duplicated_count  += 1
         continue
@@ -52,7 +52,7 @@ class Photoset:
       uploaded_count  += 1
       if callback: callback(self, photo, 0, True)
       
-      print u"uploaded({0} + {1} / {2}): {3}({4:.2f} MB)".format(uploaded_count, duplicated_count, len(self.photos), photo.title, photo.size / 1024 / 1024)
+      print u"uploaded({0} + {1} / {2}): {3}({4:.2f} MB)".format(uploaded_count, duplicated_count, len(self.photos), photo.title, photo.size / 1024 / 1024.)
       
       # update flickr side
       if not flickr_photoset:

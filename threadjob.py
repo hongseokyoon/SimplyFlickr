@@ -50,7 +50,7 @@ class UploadPhotosetsThread(StoppableThread):
       photoset_count  = 0
       for localPhotoset in self.localPhotosets:
         photoset_count  += 1
-        print u"starting uploading...({0}/{1}) {2}".format(photoset_count, len(self.localPHotosets))
+        print u"starting uploading...({0}/{1}) {2}".format(photoset_count, len(self.localPhotosets), localPhotoset.title)
         localPhotoset.upload(self.callback)
       
       print "DONE"
