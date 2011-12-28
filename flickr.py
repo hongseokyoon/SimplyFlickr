@@ -1,86 +1,7 @@
 ﻿import flickrapi
 import os
-'''
-def __read_authinfo():
-  try:
-    f = open('.authinfo', 'r')
-    Data.token, Data.nsid = f.readlines(2)
-    Data.token = Data.token.strip()
-    f.close()
-  except:
-    return False
-    
-  return True
-  
-def __write_authinfo():
-  try:
-    f = open('.authinfo', 'w')
-    f.writelines([Data.token + '\n', Data.nsid])
-    f.close()
-  except:
-    return False
-    
-  return True
-'''    
-def __photos(photoset_id):
-  page    = 1
-  pages   = 0
-  photos  = []
-  
-  while True:
-    rsp = Data.flickr.photosets_getPhotos(api_key = Data.key, photoset_id = photoset_id, page = page)
-    
-    for photoset in rsp.findall('photoset'):
-      if pages == 0:
-        pages = int(photoset.attrib['pages'])
-        
-      for photo in photoset.findall('photo'):
-        photos.append(Photo(photo.attrib['id'], photo.attrib['title']))
-    
-    if page == pages:
-      break
-    
-    page  += 1
-      
-  return photos
-  
-def load__photosets(callback):
-  rsp = Data.flickr.photosets_getList(api_key = Data.key, user_id = Data.nsid)
-  
-  photosets = []
-  
-  total_photoset  = len(rsp.find('photosets').findall('photoset'))
-  
-  for photoset in rsp.find('photosets').findall('photoset'):      
-    photosets.append(Photoset(photoset.attrib['id'], photoset.attrib['primary'], photoset.find('title').text, photoset.find('description').text))
-
-    if callback:
-      callback(len(photosets), total_photoset, photosets[-1], False)
-      
-    photosets[-1].photos  = __photos(photosets[-1].id)
-    
-    if callback:
-      callback(len(photosets), total_photoset, photosets[-1], True)
-      
-  print ">> load__photosets done"
-  return photosets
 
 def login():
-  '''
-  if Data.frob and not Data.token:
-    Data.flickr = flickrapi.FlickrAPI(Data.key, Data.secret)
-    rsp = Data.flickr.auth_getToken(api_key = Data.key, frob = Data.frob)
-    Data.token  = rsp.find('auth').find('token').text
-    Data.nsid   = rsp.find('auth').find('user').attrib['nsid']
-    __write_authinfo()
-  
-  if not __read_authinfo():
-    return False
-    
-  Data.flickr = flickrapi.FlickrAPI(Data.key, Data.secret, Data.nsid, Data.token)
-  
-  return True
-  '''
   auth_url  = None
   
   if not Data.token:
@@ -94,20 +15,8 @@ def login():
       
   return (False, auth_url)
   
-def auth():  
-  '''
-  Data.flickr = flickrapi.FlickrAPI(Data.key, Data.secret)
-  
-  rsp         = Data.flickr.auth_getFrob(api_key = Data.key)
-  Data.frob = rsp.find('frob').text
-  
-  return Data.flickr.auth_url('write', Data.frob)
-  '''
+def auth():
   (Data.token, Data.nsid) = Data.flickr.get_token_part_two((Data.token, Data.frob))
-  
-def load_photosets(callback):
-  print ">> load_photosets"
-  Photoset.load(callback)
 
 class Data:
   key     = '33726ac0a25ecf1ef45f889008fbf457'
@@ -119,8 +28,6 @@ class Data:
   nsid    = None
 
   Photosets = []
-
-#Photosets = None
 
 class Photo:
   def __init__(self, id, title):
@@ -189,11 +96,55 @@ class Photoset:
     return new_photoset
     
   @staticmethod
+  def __load_photos(flickr, api_key, photoset_id):
+    page    = 1
+    pages   = 0
+    photos  = []
+
+    while True:
+      rsp = flickr.photosets_getPhotos(api_key = api_key, photoset_id = photoset_id, page = page)
+
+      for photoset in rsp.findall('photoset'):
+        if pages == 0:
+          pages = int(photoset.attrib['pages'])
+
+        for photo in photoset.findall('photo'):
+          photos.append(Photo(photo.attrib['id'], photo.attrib['title']))
+
+      if page == pages:
+        break
+
+      page  += 1
+
+    return photos
+    
+  @staticmethod
+  def __load_photosets(flickr, api_key, user_id, callback):
+    photosets = []
+    rsp = flickr.photosets_getList(api_key = api_key, user_id = user_id)
+
+    total_photoset  = len(rsp.find('photosets').findall('photoset'))
+    
+    
+    for photoset in rsp.find('photosets').findall('photoset'):      
+      photosets.append(Photoset(photoset.attrib['id'], photoset.attrib['primary'], photoset.find('title').text, photoset.find('description').text))
+
+      if callback:
+        callback(len(photosets), total_photoset, photosets[-1], False)
+
+      # load photos in photoset
+      photosets[-1].photos  = Photoset.__load_photos(flickr, api_key, photosets[-1].id)
+
+      if callback:
+        callback(len(photosets), total_photoset, photosets[-1], True)
+        
+    return photosets
+    
+  @staticmethod
   def load(callback):
     print ">> load"
-    #global Photosets
-    #Photosets = Data.Photosets = __photosets(callback)
-    Data.Photosets  = load__photosets(callback)
+    
+    Data.Photosets  = Photoset.__load_photosets(Data.flickr, Data.key, Data.nsid, callback)
   
   def add_photo(self, photo):
     Data.flickr.photosets_addPhoto(api_key = Data.key, photoset_id = self.id, photo_id = photo.id)

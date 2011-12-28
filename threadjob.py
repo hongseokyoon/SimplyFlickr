@@ -69,7 +69,7 @@ class LoadPhotosetsThread(StoppableThread):
     
   def run(self):
     try:
-      photosets = flickr.load_photosets(self.callback)
+      photosets = flickr.Photoset.load(self.callback)
     except wx.PyDeadObjectError:
       # thread is stopped
       pass

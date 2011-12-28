@@ -114,6 +114,7 @@ class BasicPanel(wx.Panel):
     Update tree items as photosets list
     """
     
+    # remove all children if no photoset exists
     if len(self.photosets) == 0:
       self.tree.DeleteChildren(self.tree.GetRootItem())
       return
@@ -122,14 +123,14 @@ class BasicPanel(wx.Panel):
     
     for photoset in self.photosets:
       if not itemID.IsOk():
-        self._AppendTreeItem(photoset)
+        self._AppendTreeItem(photoset)  # add photoset
         continue    
       
       while itemID.IsOk():
         treePhotoset  = self.tree.GetItemData(itemID).GetData()
         itemIDCopy  = itemID
         itemID  = self.tree.GetNextSibling(itemID)
-        if (photoset == treePhotoset):  break        
+        if (photoset == treePhotoset):  break       
         self.tree.Delete(itemIDCopy)
     
     while itemID.IsOk():
@@ -300,14 +301,7 @@ class MainFrame(wx.Frame):
     self.localPanel  = LocalPanel(splitter)
     self.flickrPanel = FlickrPanel(splitter, self.Callback_LoadFlickrPhotosets)
     splitter.SplitVertically(self.localPanel, self.flickrPanel)
-    '''
-    if not flickr.login():
-      if AuthDialog(self, flickr.auth()).ShowModal() == wx.ID_OK:
-        flickr.login()
-      else:
-        wx.MessageDialog(self, 'Failed to login', 'Error', wx.OK)
-        self.Destroy()
-    '''
+    
     (succ, auth_url)  = flickr.login()
     print (succ, auth_url)
     if not succ:
@@ -318,35 +312,17 @@ class MainFrame(wx.Frame):
         self.Destroy()
         
     Publisher().subscribe(self.AddFlickrPhotoset, ('AddFlickrPhotoset'))
-    #Publisher()
-    #self.thread = LoadPhotosetsThread(flickr, self.LoadPhotosetsThreadCallback)
-    #flickr.load_photosets()
-    #self.__UpdateFlickrTree()
     
     splitter.SetSashPosition(self.GetClientSize()[0] / 2)
     splitter.SetMinimumPaneSize(100)
     #splitter.SetSashSize(5)
     
     self.SetSizeHints(300, 200)
-    '''
-    self.statusBar  = self.CreateStatusBar()
-    self.statusBar.StatusText = 'SimplyFlickr'
-    
-    statusBarClientWidth, statusBarClientHeight = self.statusBar.GetClientSize()
-    statusBarGauge = wx.Gauge(self.statusBar, size = (statusBarClientWidth / 2 - 20, statusBarClientHeight - 6), pos = (statusBarClientWidth / 2 + 10, 3))
-    '''
     
     self.__ComposeStatusBar()
     
     self.Bind(wx.EVT_SIZE, self.OnSize, self)
     self.Bind(wx.EVT_CLOSE, self.OnClose, self)
-    '''
-    self.Bind(wx.EVT_BUTTON, self.OnAddButton, localPanel.addButton)
-    self.Bind(wx.EVT_BUTTON, self.OnDelButton, localPanel.delButton)
-    self.Bind(wx.EVT_BUTTON, self.OnUpButton, localPanel.upButton)    
-    self.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnLocalTreeSelChanged, localPanel.tree)
-    '''
-    #self.Bind(wx.EVT_BUTTON, self.OnDownButton, flickrPanel.downButton)
     
     self.Show()
   
@@ -388,7 +364,7 @@ class MainFrame(wx.Frame):
     
     statusBarClientWidth, statusBarClientHeight = self.statusBar.GetClientSize()
     
-    self.statusBarGauge = wx.Gauge(self.statusBar, pos = (2, 2), size = (200, statusBarClientHeight - 4))
+    #self.statusBarGauge = wx.Gauge(self.statusBar, pos = (2, 2), size = (200, statusBarClientHeight - 4))
     self.statusBarText  = wx.StaticText(self.statusBar, pos = (210, 2), size = (statusBarClientWidth - 210, statusBarClientHeight - 4))
 
   def AddFlickrPhotoset(self, msg):
