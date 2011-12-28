@@ -1,6 +1,6 @@
 import os
 import re
-import flickr
+import remote
 
 class Photo:
   def __init__(self, path):
@@ -9,7 +9,7 @@ class Photo:
     self.size     = os.path.getsize(self.path)
     
   def upload(self, callback = None):
-    return flickr.Photo.upload(self.path, callback)
+    return remote.Photo.upload(self.path, callback)
     
 class Photoset:
   def __init__(self, dir):
@@ -34,7 +34,7 @@ class Photoset:
     return total_size
     
   def upload(self, duplicatableTitle = True, callback = None):
-    flickr_photoset = flickr.Photoset.find(self.title)
+    flickr_photoset = remote.Photoset.find(self.title)
     
     uploaded_count    = 0
     duplicated_count  = 0
@@ -56,6 +56,6 @@ class Photoset:
       
       # update flickr side
       if not flickr_photoset:
-        flickr_photoset = flickr.Photoset.create(self.title, flickr_photo)
+        flickr_photoset = remote.Photoset.create(self.title, flickr_photo)
       else:  
         flickr_photoset.add_photo(flickr_photo)

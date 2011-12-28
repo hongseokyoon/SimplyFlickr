@@ -1,7 +1,7 @@
 import threading
 import local
 import wx
-import flickr
+import remote
 from wx.lib.pubsub import Publisher
 
 class StoppableThread(threading.Thread):
@@ -60,7 +60,7 @@ class UploadPhotosetsThread(StoppableThread):
 class LoadPhotosetsThread(StoppableThread):
   def __init__(self, flickr, callback = None):
     '''
-    callback(photoset_num, total_photoset, flickr.Photoset, done)
+    callback(photoset_num, total_photoset, remote.Photoset, done)
     '''
     StoppableThread.__init__(self)
     self.flickr   = flickr
@@ -69,7 +69,7 @@ class LoadPhotosetsThread(StoppableThread):
     
   def run(self):
     try:
-      photosets = flickr.Photoset.load(self.callback)
+      photosets = remote.Photoset.load(self.callback)
     except wx.PyDeadObjectError:
       # thread is stopped
       pass
@@ -77,7 +77,7 @@ class LoadPhotosetsThread(StoppableThread):
 class DownloadPhotosetsThread(StoppableThread):
   def __init__(self, flickrPhotosets, callback = None):
     '''
-    callback(flickr.Photoset, flickr.Photo, progress, done)
+    callback(remote.Photoset, remote.Photo, progress, done)
     '''
     StoppableThread.__init__(self)
     

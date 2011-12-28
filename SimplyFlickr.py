@@ -1,4 +1,4 @@
-import flickr
+import remote
 import local
 import wx
 import time
@@ -285,7 +285,7 @@ class FlickrPanel(BasicPanel):
     
   def OnLoadButton(self, event):
     self._ClearPhotosets()
-    threadjob.LoadPhotosetsThread(flickr.Data.flickr, self.loadCallback)
+    threadjob.LoadPhotosetsThread(remote.Data.flickr, self.loadCallback)
     
   def OnDownButton(self, event):
     threadjob.DownloadPhotosetsThread(self.photosets, self.downCallback)
@@ -302,7 +302,7 @@ class MainFrame(wx.Frame):
     self.flickrPanel = FlickrPanel(splitter, self.Callback_LoadFlickrPhotosets)
     splitter.SplitVertically(self.localPanel, self.flickrPanel)
     
-    (succ, auth_url)  = flickr.login()
+    (succ, auth_url)  = remote.login()
     print (succ, auth_url)
     if not succ:
       if AuthDialog(self, auth_url).ShowModal() == wx.ID_OK:
