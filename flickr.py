@@ -23,13 +23,24 @@ def __write_authinfo():
   return True
 '''    
 def __photos(photoset_id):
-  rsp = Data.flickr.photosets_getPhotos(api_key = Data.key, photoset_id = photoset_id)
-  
+  page    = 1
+  pages   = 0
   photos  = []
   
-  for photoset in rsp.findall('photoset'):
-    for photo in photoset.findall('photo'):
-      photos.append(Photo(photo.attrib['id'], photo.attrib['title']))
+  while True:
+    rsp = Data.flickr.photosets_getPhotos(api_key = Data.key, photoset_id = photoset_id, page = page)
+    
+    for photoset in rsp.findall('photoset'):
+      if pages == 0:
+        pages = int(photoset.attrib['pages'])
+        
+      for photo in photoset.findall('photo'):
+        photos.append(Photo(photo.attrib['id'], photo.attrib['title']))
+    
+    if page == pages:
+      break
+    
+    page  += 1
       
   return photos
   
