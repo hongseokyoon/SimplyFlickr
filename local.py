@@ -1,21 +1,24 @@
 import os
 import re
-import remote
+import flickr
 
 class Photo:
-  def __init__(self, path):
-    self.path     = path
-    self.title    = path.split('/')[-1][0:-4]
-    self.size     = os.path.getsize(self.path)
+  def __init__(self, path, data = None):
+    self.path   = path
+    self.title  = path.split('/')[-1][0:-4]
+    self.size   = os.path.getsize(self.path)
+    self.data   = data
     
   def upload(self, callback = None):
-    return remote.Photo.upload(self.path, callback)
+    photo_id  = flickr.upload_photo(self.path, self.title, callback)
+    return photo_id
     
 class Photoset:
-  def __init__(self, dir):
+  def __init__(self, dir, data = None):
     self.dir    = dir
     self.title  = dir.split('/')[-1]
     self.photos = []
+    self.data   = data
     self.__load_dir(dir)
     
   def __load_dir(self, dir):
@@ -27,35 +30,32 @@ class Photoset:
         self.photos.append(Photo(dir + '/' + filename))
     
   def size(self):
-    total_size  = 0
-    for photo in self.photos:
-      total_size  += photo.size
+    return sum([photo.size for photo in self.photos])
+    
+  def upload(self, callback = None):
+    '''
+    the title should not be duplicated
+    '''
+    photoset_ids  = flickr.find_photoset_ids(self.title)
+    photoset_id   = None
       
-    return total_size
-    
-  def upload(self, duplicatableTitle = True, callback = None):
-    flickr_photoset = remote.Photoset.find(self.title)
-    
     uploaded_count    = 0
-    duplicated_count  = 0
     for photo in self.photos:
       def __upload_callback(progress, done):
         callback(self, photo, progress, done)
       
-      if duplicatableTitle == False and flickr_photoset and flickr_photoset.find_photo(photo.title):
-        print 'duplicated photo:', photo.__dict__
-        duplicated_count  += 1
-        continue
-      
-      if callback: callback(self, photo, 0, False)
-      flickr_photo  = photo.upload(__upload_callback if callback else None)
+      if callback: callback(self, photo, 0, False)  # begin upload
+      photo_id  = photo.upload(__upload_callback if callback else None)
       uploaded_count  += 1
-      if callback: callback(self, photo, 0, True)
+      if callback: callback(self, photo, 0, True)   # end upload
       
-      print u"uploaded({0} + {1} / {2}): {3}({4:.2f} MB)".format(uploaded_count, duplicated_count, len(self.photos), photo.title, photo.size / 1024 / 1024.)
+      print u"uploaded({0}/{1}): {2}({3:.2f} MB)".format(uploaded_count, len(self.photos), photo.title, photo.size / 1024 / 1024.)
       
-      # update flickr side
-      if not flickr_photoset:
-        flickr_photoset = remote.Photoset.create(self.title, flickr_photo)
-      else:  
-        flickr_photoset.add_photo(flickr_photo)
+      if photoset_id == None:
+        if len(photoset_ids) > 0:
+          photoset_id = photoset_ids[-1]  # choose latest photoset
+        else:
+          photoset_id = flickr.create_photoset(self.title, "", photo_id)
+          continue
+          
+      flickr.add_photo(photoset_id, photo_id) # set photoset

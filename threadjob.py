@@ -1,93 +1,90 @@
 import threading
-import local
 import wx
+import local
 import remote
+import flickr
 from wx.lib.pubsub import Publisher
 
 class StoppableThread(threading.Thread):
   def __init__(self):
-    super(StoppableThread, self).__init__()
+    threading.Thread.__init__(self)
     self._stop = threading.Event()
 
   def stop(self):
-    self._stop.set()
+    print "stop"
+    if self.isAlive() == True:
+      self._stop.set()
+      self.join()
+      print "stopped"
 
-  def stopped(self):
-    return self._stop.isSet()
-    
-class AddPhotosetThread(StoppableThread):
-  def __init__(self, dir, callback = None):
-    '''
-    callback(local.Photoset)
-    '''
+class LoadLocalPhotoset(StoppableThread):
+  def __init__(self, dir):
     StoppableThread.__init__(self)
-    self.dir      = dir
-    self.callback = callback
+    self.dir  = dir
     self.start()
     
   def run(self):
-    try:    
-      print 'run AddPhotosetThread'
-      localPhotoset = local.Photoset(self.dir)
-      print self.dir
-      print localPhotoset
-      if self.callback: self.callback(localPhotoset)
+    try:
+      photoset  = local.Photoset(self.dir)
+      Publisher().sendMessage(('LoadLocalPhotoset'), photoset)
     except wx.PyDeadObjectError:
       pass
-    
-class UploadPhotosetsThread(StoppableThread):
-  def __init__(self, localPhotosets, callback = None):
+
+class UploadLocalPhotosets(StoppableThread):
+  def __init__(self, photosets, callback = None):
     '''
     callback(local.Photoset, local.Photo, progress, done)
     '''
     StoppableThread.__init__(self)
-    self.localPhotosets = localPhotosets
-    self.callback       = callback
+    self.photosets  = photosets
+    self.callback   = callback
     self.start()
     
   def run(self):
     try:
-      photoset_count  = 0
-      for localPhotoset in self.localPhotosets:
-        photoset_count  += 1
-        print u"starting uploading...({0}/{1}) {2}".format(photoset_count, len(self.localPhotosets), localPhotoset.title)
-        localPhotoset.upload(self.callback)
-      
-      print "DONE"
+      for photoset in self.photosets:
+        photoset.upload(self.callback)
+        
+      Publisher().sendMessage(('UploadLocalPhotosets'), self.photosets)
     except wx.PyDeadObjectError:
       pass
-    
-class LoadPhotosetsThread(StoppableThread):
-  def __init__(self, flickr, callback = None):
-    '''
-    callback(photoset_num, total_photoset, remote.Photoset, done)
-    '''
+
+class LoadRemotePhotosets(StoppableThread):
+  def __init__(self):
     StoppableThread.__init__(self)
-    self.flickr   = flickr
-    self.callback = callback
     self.start()
     
   def run(self):
+    photosets = []
+    
     try:
-      photosets = remote.Photoset.load(self.callback)
+      for photoset_info in flickr.load_photosets():
+        photoset  = remote.Photoset(photoset_info['id'], photoset_info['primary'], photoset_info['title'], photoset_info['description'])
+        for photo_info in flickr.load_photos(photoset.id):
+          photoset.photos.append(remote.Photo(photo_info['id'], photo_info['title']))
+          
+        photosets.append(photoset)
+        Publisher().sendMessage(('LoadRemotePhotoset'), photoset)
+      
+      Publisher().sendMessage(('LoadRemotePhotosets'), photosets)
     except wx.PyDeadObjectError:
-      # thread is stopped
       pass
       
-class DownloadPhotosetsThread(StoppableThread):
-  def __init__(self, flickrPhotosets, callback = None):
+class DownloadRemotePhotosets(StoppableThread):
+  def __init__(self, photosets, callback = None):
     '''
     callback(remote.Photoset, remote.Photo, progress, done)
     '''
     StoppableThread.__init__(self)
     
-    self.flickrPhotosets  = flickrPhotosets
-    self.callback         = callback
+    self.photosets  = photosets
+    self.callback   = callback
     self.start()
     
   def run(self):
     try:
-      for flickrPhotoset in self.flickrPhotosets:
-        flickrPhotoset.download(self.callback)
+      for photoset in self.photosets:
+        photoset.download(self.callback)
+      Publisher().sendMessage(('DownloadRemotePhotosets'), self.photosets)
     except wx.PyDeadObjectError:
       pass

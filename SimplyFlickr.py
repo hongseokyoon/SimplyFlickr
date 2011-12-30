@@ -1,8 +1,8 @@
-import remote
-import local
 import wx
+import local
+import remote
+import flickr
 import time
-#import threading
 from wx.lib.pubsub import Publisher
 import threadjob
 
@@ -56,6 +56,8 @@ class BasicPanel(wx.Panel):
   def __init__(self, parent, rootTitle):
     wx.Panel.__init__(self, parent)
     
+    self.threads    = []
+    
     sizer           = wx.BoxSizer(wx.VERTICAL)
     
     self.viewSizer  = wx.BoxSizer(wx.HORIZONTAL)
@@ -80,6 +82,24 @@ class BasicPanel(wx.Panel):
     
     self.tree.Bind(wx.EVT_LEFT_DOWN, self.OnTreeLeftClick)
   
+  def _FindThread(self, name):
+    return len([thread for thread in self.threads if thread.__class__.__name__]) > 0
+    
+  def _AddThread(self, thread):
+    self.threads.append(thread)
+    
+  def _DelThread(self, name):
+    self.threads  = filter(lambda thread: thread.__class__.__name__ != name, self.threads)
+  
+  def _StopThread(self, name):
+    print ">> _StopThread name: {0}".format(name)
+    map(lambda thread: thread.stop(), [thread for thread in self.threads if thread.__class__.__name__ == name])
+    
+  def StopThreads(self):
+    print ">> StopThreads"
+    map(lambda thread: thread.stop(), self.threads)
+    self.threads  = []
+  
   def _AddPhotoset(self, photoset):
     self.photosets.append(photoset)    
     self._UpdateTree()
@@ -100,10 +120,11 @@ class BasicPanel(wx.Panel):
   
   def _AppendTreeItem(self, photoset):
     item  = self.tree.AppendItem(self.tree.GetRootItem(), '[ ] ' + self._GetPhotosetTitle(photoset), data = wx.TreeItemData(photoset))
+    photoset.data = item
     
     # sub trees - photos
     for photo in photoset.photos:
-      self.tree.AppendItem(item, '[ ] ' + self._GetPhotoTitle(photo), data = wx.TreeItemData(photo))
+      photo.data  = self.tree.AppendItem(item, '[ ] ' + self._GetPhotoTitle(photo), data = wx.TreeItemData(photo))
     
     # expand root
     if self.tree.GetChildrenCount(self.tree.GetRootItem(), False) == 1:
@@ -195,38 +216,39 @@ class BasicPanel(wx.Panel):
     event.Skip()
       
 class LocalPanel(BasicPanel):
-  def __init__(self, parent, upCallback = None, addCallback = None):
+  def __init__(self, parent, uploadCallback = None):
     BasicPanel.__init__(self, parent, 'Local')
     
-    self.upCallback   = upCallback
-    self.addCallback  = addCallback
+    self.uploadCallback = uploadCallback
     
-    self.addButton  = wx.Button(self, label = '+', size = (30, 30))
-    self.delButton  = wx.Button(self, label = '-', size = (30, 30))
-    self.upButton   = wx.Button(self, label = '^', size = (30, 30))
+    self.addButton    = wx.Button(self, label = '+', size = (30, 30))
+    self.delButton    = wx.Button(self, label = '-', size = (30, 30))
+    self.uploadButton = wx.Button(self, label = '^', size = (30, 30))
  
     self.inputSizer.Add(self.addButton, flag = wx.ALL, border = 5)
     self.inputSizer.Add(self.delButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
-    self.inputSizer.Add(self.upButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
+    self.inputSizer.Add(self.uploadButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
 
     self.Bind(wx.EVT_BUTTON, self.OnAddButton, self.addButton)
     self.Bind(wx.EVT_BUTTON, self.OnDelButton, self.delButton)
-    self.Bind(wx.EVT_BUTTON, self.OnUpButton, self.upButton)    
-    self.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnTreeSelChanged, self.tree)
+    self.Bind(wx.EVT_BUTTON, self.OnUploadButton, self.uploadButton)
     
-    #self.tree.Bind(wx.EVT_LEFT_DOWN, self.OnTreeLeftClick)
+    Publisher().subscribe(self.LoadLocalPhotoset, ('LoadLocalPhotoset'))
+    Publisher().subscribe(self.UploadLocalPhotosets, ('UploadLocalPhotosets'))
     
   def OnAddButton(self, event):
+    if self._FindThread('LoadLocalPHotoset'):
+      wx.MessageDialog(self, u'Already adding folder...', 'Error', wx.OK).ShowModal()
+      return
+      
     dialog  = wx.DirDialog(self)
     if (dialog.ShowModal() == wx.ID_OK):
       dir = dialog.GetPath().replace('\\', '/')
       
-      if self._PhotosetExist(dir):
-        wx.MessageDialog(self, 'Duplicated path: %s' % dir, 'Error', wx.OK).ShowModal()
+      if len([photoset for photoset in self.photosets if photoset.dir == dir]) > 0: # dir already exists
+        wx.MessageDialog(self, u'Duplicated path: {0}'.format(dir), 'Error', wx.OK).ShowModal()
       else:
-        #self._AddPhotoset(local.Photoset(dir))
-        #threadjob.AddPhotosetThread(dir, self.addCallback)
-        threadjob.AddPhotosetThread(dir, self.AddPhotosetCallback)
+        self._AddThread(threadjob.LoadLocalPhotoset(dir))
   
     dialog.Destroy()
     
@@ -237,62 +259,74 @@ class LocalPanel(BasicPanel):
     photoset  = self.tree.GetItemData(self.tree.GetSelection()).GetData()
     self._DelPhotoset(photoset)
     
-  def OnUpButton(self, event):
-    threadjob.UploadPhotosetsThread(self.photosets, self.upCallback)
+  def OnUploadButton(self, event):
+    if self._FindThread('UploadLocalPhotosets'):
+      wx.MessageDialog(self, u'Already uploading...', 'Error', wx.OK).ShowModal()
+      return
       
-  def OnTreeSelChanged(self, event):
-    pass
-  '''
-  def OnTreeLeftClick(self, event):
-    #self.tree.UnselectAll()
-    itemID, flags = self.tree.HitTest(event.GetPosition())
-    if (flags & wx.TREE_HITTEST_ONITEM) != 0:
-      self.tree.SetItemBold(itemID, not self.tree.IsBold(itemID))
-  '''
-  def _PhotosetExist(self, dir):
-    for photoset in self.photosets:
-      if photoset.dir == dir:
-        return True
-        
-    return False
+    self._AddThread(threadjob.UploadLocalPhotosets(self._GetCheckedPhotosets(), self.uploadCallback))
   
-  def _GetPhotosetTitle(self, photoset):
-    total_size  = 0
-    for photo in photoset.photos:
-      total_size  += photo.size
-    
-    return '%s: %d photo(s) %.1d MB' % (photoset.title, len(photoset.photos), total_size / 1024.0 / 1024.0)
-    
-  def AddPhotosetCallback(self, localPhotoset):
-    print 'AddPhotosetCallback'
-    self._AddPhotoset(localPhotoset)
+  def _GetCheckedPhotosets(self):
+    # filter checked photos only
+    checked_photosets = []
 
+    for photoset in self.photosets:
+      checked_photoset  = local.Photoset(dir = photoset.dir, data = photoset.data)
+      checked_photoset.photos = [photo for photo in photoset.photos if self._TreeItemChecked(photo.data)]
+      if len(checked_photoset.photos) > 0:
+        checked_photosets.append(checked_photoset)
+    
+    return checked_photosets
+  
+  def _GetPhotosetTitle(self, photoset):  # override
+    return u'{0}: {1} photo(s) {2:.2f} MB'.format(photoset.title, len(photoset.photos), photoset.size() / 1024.0 / 1024.0)
+
+  # pubsub message callback ===================================================
+  def LoadLocalPhotoset(self, msg):
+    self._AddPhotoset(msg.data)
+    self._DelThread('LoadLocalPhotoset')
+    
+  def UploadLocalPhotosets(self, msg):
+    print 'Done uploading'
+    print self.threads
+    self._DelThread('UploadLocalPhotosets')
+    print self.threads
+    
 class FlickrPanel(BasicPanel):
-  def __init__(self, parent, loadCallback = None, downCallback = None):
+  def __init__(self, parent, downloadCallback = None):
     BasicPanel.__init__(self, parent, 'Flickr')
      
-    self.loadCallback = loadCallback
-    self.downCallback = downCallback
+    self.downloadCallback = downloadCallback
     
     self.loadButton = wx.Button(self, label = 'L', size = (30, 30))
-    self.downButton = wx.Button(self, label = 'v', size = (30, 30))
+    self.downloadButton = wx.Button(self, label = 'v', size = (30, 30))
     
     self.inputSizer.Add(self.loadButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
-    self.inputSizer.Add(self.downButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
+    self.inputSizer.Add(self.downloadButton, flag = wx.TOP | wx.RIGHT | wx.BOTTOM, border = 5)
   
     self.Bind(wx.EVT_BUTTON, self.OnLoadButton, self.loadButton)
-    self.Bind(wx.EVT_BUTTON, self.OnDownButton, self.downButton)
+    self.Bind(wx.EVT_BUTTON, self.OnDownloadButton, self.downloadButton)
+    
+    Publisher().subscribe(self.LoadRemotePhotoset, ('LoadRemotePhotoset'))
+    Publisher().subscribe(self.LoadRemotePhotosets, ('LoadRemotePhotosets'))
     
   def OnLoadButton(self, event):
     self._ClearPhotosets()
-    threadjob.LoadPhotosetsThread(remote.Data.flickr, self.loadCallback)
+    threadjob.LoadRemotePhotosets()
     
-  def OnDownButton(self, event):
-    threadjob.DownloadPhotosetsThread(self.photosets, self.downCallback)
+  def OnDownloadButton(self, event):
+    threadjob.DownloadPhotosetsThread(self._GetCheckedPhotosets, self.downloadCallback)
     
   def _GetPhotosetTitle(self, photoset):
     return '%s: %d photo(s)' % (photoset.title, len(photoset.photos))
 
+  # pubsub message callback ===================================================
+  def LoadRemotePhotoset(self, msg):
+    self._AddPhotoset(msg.data)
+    
+  def LoadRemotePhotosets(self, msg):
+    pass
+  
 class MainFrame(wx.Frame):
   def __init__(self, parent):
     wx.Frame.__init__(self, parent, title = 'SimplyFlickr', size = (600, 400))
@@ -302,7 +336,8 @@ class MainFrame(wx.Frame):
     self.flickrPanel = FlickrPanel(splitter, self.Callback_LoadFlickrPhotosets)
     splitter.SplitVertically(self.localPanel, self.flickrPanel)
     
-    (succ, auth_url)  = remote.login()
+    # authentication
+    (succ, auth_url)  = flickr.login()
     print (succ, auth_url)
     if not succ:
       if AuthDialog(self, auth_url).ShowModal() == wx.ID_OK:
@@ -321,7 +356,6 @@ class MainFrame(wx.Frame):
     
     self.__ComposeStatusBar()
     
-    self.Bind(wx.EVT_SIZE, self.OnSize, self)
     self.Bind(wx.EVT_CLOSE, self.OnClose, self)
     
     self.Show()
@@ -339,12 +373,10 @@ class MainFrame(wx.Frame):
   def UploadPhotosetsThreadCallback(self, photoset, photo, progress, done):
     print 'UploadPhotosetsThreadCallback:', photoset.title, photo.title, progress, done
     
-  def OnSize(self, event):
-    
-    event.Skip()
-    
   def OnClose(self, event):
     #if self.thread: self.thread.stop()
+    self.localPanel.StopThreads()
+    self.flickrPanel.StopThreads()
     event.Skip()
   '''  
   def __UpdateStatusBarText(self):
